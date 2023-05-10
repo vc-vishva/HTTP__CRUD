@@ -1,112 +1,115 @@
-
 const http = require('http');
 const url = require('url');
-const querystring = require('querystring');
+const fs = require('fs');
 const port = 3000;
 
-const object = [
-  {
-    id: 1,
-    name: "viva",
-    age: 20
-  },
-  {
-    id: 2,
-    name: "visha",
-    age: 21
-  },
-  {
-    id: 3,
-    name: "mahi",
-    age: 22
-  }
-]
-
 const server = http.createServer((req, res) => {
-  const { pathname, query } = url.parse(req.url, true);
+  const reqUrl = url.parse(req.url, true);
+  const filePath = './db.json';
 
-  if (req.method === 'GET' && pathname === '/') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.write(JSON.stringify({ status: 200, message: "This is get methods running", data: object }));
-    res.end();
-  }
-  else if (req.method === 'GET' && pathname === '/id') {
-    const id = parseInt(query.id);
-    const obj = object.find(obj => obj.id == id);
-    if (obj) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.write(JSON.stringify({ status: 200, message: "This is get methods running", data: obj }));
-      res.end();
-    }
-    else {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.write(JSON.stringify({ status: 404, message: "Data not found" }));
-      res.end();
-    }
-  }
-  else if (req.method === 'PUT' && pathname === '/id') {
-    let body = '';
-    req.on('data', chunk => {
-      body += chunk.toString();
-    });
-    req.on('end', () => {
-      const { name, age } = querystring.parse(body);
-      const id = parseInt(query.id);
-      const newObject = object.find(obj => obj.id == id);
-      if (newObject) {
-        newObject.name = name;
-        newObject.age = age;
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.write(JSON.stringify({ status: 200, message: "This is put methods running", data: newObject }));
-        res.end();
-      }
-      else {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.write(JSON.stringify({ status: 404, message: "Data not found" }));
-        res.end();
-      }
-    });
-  }
-  else if (req.method === 'POST' && pathname === '/') {
-    let body = '';
-    req.on('data', chunk => {
-      body += chunk.toString();
-    });
-    req.on('end', () => {
-      const { name, age } = querystring.parse(body);
-      const newId = object.length + 1;
-      const newObject = { id: newId, name, age };
-      object.push(newObject);
-      res.writeHead(201, { 'Content-Type': 'application/json' });
-      res.write(JSON.stringify({ status: 201, message: "This is post methods running", data: newObject }));
-      res.end();
-    });
-  }
   
-  else if (req.method === 'DELETE' && pathname === '/id') {
-    const id = parseInt(query.id);
-    const obj = object.find(obj => obj.id == id);
-    if (obj) {
-      const index = object.indexOf(obj);
-      object.splice(index, 1);
+  fs.access(filePath,  (err) => {
+    if (err) {
+      console.log('Database file does not exist, creating new file...!!!!!!');
+      fs.writeFileSync(filePath, '[]');
+    }
+
+    // Retrieve data from the database
+    if (reqUrl.pathname === '/get') {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.write(JSON.stringify({ status: 200, message: "This is delete methods running", data: obj }));
-      res.end();
+      res.end(JSON.stringify(data));
     }
+    else if (reqUrl.pathname === '/show') {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const email = reqUrl.query.email;
+      const userData = data.find((item) => item.email === email);
+      if (userData) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(userData));
+      } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+      }
+
+        res.end('User data not found');
+      }
+  
+
+    // Add new data to the database
+    else if (reqUrl.pathname === '/add') {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk.toString();
+      });
+      req.on('end', () => {
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        const newData = JSON.parse(body);
+        data.push(newData);
+        fs.writeFileSync(filePath, JSON.stringify(data));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        
+      
+        // res.end('Data added successfully');
+        res.end(JSON.stringify(newData));
+
+      });
+    }
+
+    // Update data in the database
+    else if (reqUrl.pathname === '/update') {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk.toString();
+      });
+      req.on('end', () => {
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        const newData = JSON.parse(body);
+        const index = data.findIndex((item) => item.email === newData.email);
+        if (index !== -1) {
+          data[index] = newData;
+          fs.writeFileSync(filePath, JSON.stringify(data));
+          // res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(newData));
+          
+          // res.end('Data updated successfully');
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          
+          
+          res.end('Data not found');
+          // res.end(JSON.stringify(newData));
+
+        }
+      });
+    }
+
+    // Remove data from the database
+    else if (reqUrl.pathname === '/delete') {
+      const email = reqUrl.query.email;
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const index = data.findIndex((item) => item.email === email);
+      if (index !== -1) {
+        data.splice(index, 1);
+        fs.writeFileSync(filePath, JSON.stringify(data));
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('Data removed successfully');
+        //  res.end(JSON.stringify(newData));
+
+      } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Data not found');
+      }
+    }
+
+    // Invalid request
     else {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.write(JSON.stringify({ status: 404, message: "Data not found" }));
-      res.end();
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Invalid request');
     }
-  }
-  else {
-    res.writeHead(404, { 'Content-Type': 'text/html' });
-    res.write('<h1>404 Not Found</h1>');
-    res.end();
-  }
-});
+  });
+ });
 
-server.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+server.listen(3000, () => {
+  console.log(`Server started on port ${port}`);
 });
-
