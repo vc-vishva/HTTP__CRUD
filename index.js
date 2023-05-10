@@ -75,3 +75,8 @@ app.delete("/:id", (req, res) =>{
         }
     });
 app.listen(3000, () => console.log(` server start ,${port}`));
+const newData = { /* your data object */ };
+const message = "Here's your data!";
+const response = { message, data: newData };
+
+res.end(JSON.stringify(response));
